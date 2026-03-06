@@ -1,0 +1,37 @@
+name: contracts
+version: "1.0.0"
+api_version: "1"
+description: Contract analysis example pack
+document_detection:
+  min_matches: 2
+  patterns:
+    - "\\bagreement\\b"
+    - "\\bparty\\b"
+    - "\\btermination\\b"
+doctags:
+  headings:
+    - pattern: "^(Definitions)$"
+      tag_type: "definition"
+  paragraphs:
+    - pattern: "\\bexcept where\\b"
+      tag_type: "exception"
+query_routing:
+  markers:
+    - "\\bcontract\\b"
+    - "\\bagreement\\b"
+  rules:
+    - pattern: "\\btermination\\b"
+      query_type: "analytical"
+      recommended_strategy: "hybrid"
+      confidence: 0.85
+query_expansions:
+  indemnity:
+    - risk allocation
+synthesis_profile:
+  requires_citations: true
+  required_sections:
+    - answer
+    - supporting_authorities
+benchmark_datasets:
+  - name: contract_eval
+    path: benchmarks/contract_eval.jsonl

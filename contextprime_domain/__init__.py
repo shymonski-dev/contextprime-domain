@@ -1,0 +1,71 @@
+"""Domain pack interfaces and built-in registry."""
+
+from .base import (
+    DomainBenchmarkDataset,
+    DomainBenchmarkSample,
+    DomainDetection,
+    DomainModelBinding,
+    DomainModelResolution,
+    DomainPack,
+    DomainPackValidationMessage,
+    DomainPackValidationReport,
+    DomainQueryClassification,
+    DomainValidationIssue,
+    DomainVerifierResult,
+    DomainValidatorSpec,
+)
+from .loader import (
+    FileSystemDomainPack,
+    discover_domain_packs,
+    load_domain_manifest,
+    load_domain_pack_from_dir,
+    resolve_domain_model_binding,
+    summarize_domain_pack,
+    validate_domain_pack,
+    validate_domain_pack_dir,
+)
+from .manifest import (
+    DOMAIN_PACK_API_VERSION,
+    DOMAIN_PACK_SCHEMA_VERSION,
+    DomainBenchmarkDatasetManifest,
+    DomainModelManifest,
+    DomainPackManifest,
+    DomainVerifierConfigManifest,
+    DomainValidatorManifest,
+)
+from .legal import LegalDomainPack
+from .registry import DomainRegistry, get_default_domain_registry, reset_default_domain_registry
+
+__all__ = [
+    "DOMAIN_PACK_API_VERSION",
+    "DOMAIN_PACK_SCHEMA_VERSION",
+    "DomainBenchmarkDataset",
+    "DomainBenchmarkSample",
+    "DomainBenchmarkDatasetManifest",
+    "DomainDetection",
+    "DomainModelBinding",
+    "DomainModelManifest",
+    "DomainModelResolution",
+    "DomainPack",
+    "DomainPackValidationMessage",
+    "DomainPackValidationReport",
+    "DomainQueryClassification",
+    "DomainValidationIssue",
+    "DomainVerifierConfigManifest",
+    "DomainVerifierResult",
+    "DomainValidatorSpec",
+    "DomainPackManifest",
+    "DomainValidatorManifest",
+    "DomainRegistry",
+    "FileSystemDomainPack",
+    "LegalDomainPack",
+    "discover_domain_packs",
+    "load_domain_manifest",
+    "load_domain_pack_from_dir",
+    "resolve_domain_model_binding",
+    "summarize_domain_pack",
+    "validate_domain_pack",
+    "validate_domain_pack_dir",
+    "get_default_domain_registry",
+    "reset_default_domain_registry",
+]

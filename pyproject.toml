@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "contextprime-domain"
+version = "0.1.0"
+description = "Standalone domain-pack platform for ContextPrime-style RAG systems"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "loguru>=0.7.0",
+    "pydantic>=2.12.5",
+    "PyYAML>=6.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=9.0.2",
+]
+
+[project.scripts]
+contextprime-domain = "contextprime_domain.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["contextprime_domain*"]
