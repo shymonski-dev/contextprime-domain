@@ -23,6 +23,7 @@ from .base import (
     DomainPackValidationMessage,
     DomainPackValidationReport,
     DomainQueryClassification,
+    DomainValidationIssue,
     DomainValidatorSpec,
 )
 from .manifest import (
@@ -33,6 +34,14 @@ from .manifest import (
     DomainPackManifest,
     DomainTagRuleManifest,
 )
+
+
+def _assert_within_source_dir(resolved: Path, source_dir: Path) -> None:
+    source = source_dir.resolve()
+    if not str(resolved).startswith(str(source) + "/") and resolved != source:
+        raise ValueError(
+            f"path escapes pack directory: {resolved} is not within {source}"
+        )
 
 
 class FileSystemDomainPack(DomainPack):
@@ -179,7 +188,46 @@ class FileSystemDomainPack(DomainPack):
         results: List[Dict[str, Any]],
         synthesis_profile: Dict[str, Any],
     ) -> List[DomainValidationIssue]:
-        return []
+        issues: List[DomainValidationIssue] = []
+        for spec in self.validator_specs():
+            vtype = spec.validator_type
+            if vtype == "pattern_present":
+                pattern = spec.config.get("pattern", "")
+                if pattern and not re.search(pattern, answer, re.IGNORECASE):
+                    issues.append(
+                        DomainValidationIssue(
+                            validator_name=spec.name,
+                            message=spec.message or f"Answer does not match required pattern: {pattern}",
+                            severity=spec.severity,
+                        )
+                    )
+            elif vtype == "pattern_absent":
+                pattern = spec.config.get("pattern", "")
+                if pattern and re.search(pattern, answer, re.IGNORECASE):
+                    issues.append(
+                        DomainValidationIssue(
+                            validator_name=spec.name,
+                            message=spec.message or f"Answer contains disallowed pattern: {pattern}",
+                            severity=spec.severity,
+                        )
+                    )
+            elif vtype == "section_present":
+                section = spec.config.get("section", "")
+                if section and section.lower() not in answer.lower():
+                    issues.append(
+                        DomainValidationIssue(
+                            validator_name=spec.name,
+                            message=spec.message or f"Answer is missing required section: {section}",
+                            severity=spec.severity,
+                        )
+                    )
+            else:
+                logger.debug(
+                    "Domain pack {} has no runtime implementation for validator type {}",
+                    self.name,
+                    vtype,
+                )
+        return issues
 
     def benchmark_metadata(self) -> Dict[str, object]:
         return dict(self.manifest.benchmark_metadata)
@@ -238,35 +286,37 @@ class FileSystemDomainPack(DomainPack):
 
     def _load_benchmark_samples(self, path: Path) -> List[DomainBenchmarkSample]:
         samples: List[DomainBenchmarkSample] = []
-        for raw_line in path.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                payload = json.loads(line)
-            except json.JSONDecodeError:
-                logger.warning("Skipping invalid benchmark row in {}", path)
-                continue
-            if isinstance(payload, dict):
-                query = str(payload.get("query", "")).strip()
-                if not query:
+        with path.open(encoding="utf-8") as fh:
+            for raw_line in fh:
+                line = raw_line.strip()
+                if not line:
                     continue
-                samples.append(
-                    DomainBenchmarkSample(
-                        query=query,
-                        expected_ids=[str(item) for item in payload.get("expected_ids", [])],
-                        expected_terms=[str(item) for item in payload.get("expected_terms", [])],
-                        answer_terms=[str(item) for item in payload.get("answer_terms", [])],
-                        metadata=dict(payload.get("metadata") or {}),
+                try:
+                    payload = json.loads(line)
+                except json.JSONDecodeError:
+                    logger.warning("Skipping invalid benchmark row in {}", path)
+                    continue
+                if isinstance(payload, dict):
+                    query = str(payload.get("query", "")).strip()
+                    if not query:
+                        continue
+                    samples.append(
+                        DomainBenchmarkSample(
+                            query=query,
+                            expected_ids=[str(item) for item in payload.get("expected_ids", [])],
+                            expected_terms=[str(item) for item in payload.get("expected_terms", [])],
+                            answer_terms=[str(item) for item in payload.get("answer_terms", [])],
+                            metadata=dict(payload.get("metadata") or {}),
+                        )
                     )
-                )
         return samples
 
     def _to_benchmark_dataset(
         self,
         dataset: DomainBenchmarkDatasetManifest,
     ) -> DomainBenchmarkDataset:
-        resolved_path = self.source_dir / dataset.path
+        resolved_path = (self.source_dir / dataset.path).resolve()
+        _assert_within_source_dir(resolved_path, self.source_dir)
         return DomainBenchmarkDataset(
             name=dataset.name,
             path=str(resolved_path),
@@ -298,7 +348,12 @@ class FileSystemDomainPack(DomainPack):
         slot: str,
         binding: DomainModelManifest,
     ) -> DomainModelBinding:
-        resolved_path = str((self.source_dir / binding.path).resolve()) if binding.path else None
+        if binding.path:
+            resolved_path = (self.source_dir / binding.path).resolve()
+            _assert_within_source_dir(resolved_path, self.source_dir)
+            resolved_path = str(resolved_path)
+        else:
+            resolved_path = None
         return DomainModelBinding(
             slot=str(slot).strip(),
             model=str(binding.model).strip() if binding.model else None,
@@ -324,6 +379,10 @@ def load_domain_pack_from_dir(directory: Path) -> FileSystemDomainPack:
     if not manifest_path.exists():
         raise FileNotFoundError(f"Domain manifest not found: {manifest_path}")
     manifest = load_domain_manifest(manifest_path)
+    errors, _ = _validate_manifest_compatibility(manifest)
+    if errors:
+        messages = "; ".join(e.message for e in errors)
+        raise ValueError(f"Incompatible domain manifest at {manifest_path}: {messages}")
     return FileSystemDomainPack(manifest, source_dir=source_dir)
 
 
@@ -590,18 +649,6 @@ def _validate_manifest_compatibility(
             )
         )
 
-    if str(manifest.api_version) != DOMAIN_PACK_API_VERSION:
-        errors.append(
-            DomainPackValidationMessage(
-                level="error",
-                field="api_version",
-                message=(
-                    f"unsupported api_version '{manifest.api_version}'; "
-                    f"expected {DOMAIN_PACK_API_VERSION}"
-                ),
-            )
-        )
-
     current_version = _current_contextprime_version()
     if manifest.min_contextprime_version and _compare_versions(
         current_version,
@@ -643,6 +690,18 @@ def _current_contextprime_version() -> str:
 
 
 def _compare_versions(left: str, right: str) -> int:
+    try:
+        from packaging.version import Version
+        lv = Version(str(left or "0.0.0"))
+        rv = Version(str(right or "0.0.0"))
+        if lv < rv:
+            return -1
+        if lv > rv:
+            return 1
+        return 0
+    except Exception:
+        pass
+
     def normalize(value: str) -> List[int]:
         parts = re.findall(r"\d+", str(value or ""))
         values = [int(part) for part in parts[:3]]

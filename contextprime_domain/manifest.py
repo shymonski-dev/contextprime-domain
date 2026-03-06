@@ -4,6 +4,7 @@ Manifest models for declarative domain packs.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -21,6 +22,15 @@ class DomainTagRuleManifest(BaseModel):
     confidence: float = Field(default=0.9, ge=0.0, le=1.0)
     ignore_case: bool = True
 
+    @field_validator("pattern")
+    @classmethod
+    def validate_pattern(cls, value: str) -> str:
+        try:
+            re.compile(value)
+        except re.error as exc:
+            raise ValueError(f"invalid regex pattern: {exc}") from exc
+        return value
+
 
 class DomainQueryRuleManifest(BaseModel):
     """Declarative rule for classifying domain-specific queries."""
@@ -31,6 +41,15 @@ class DomainQueryRuleManifest(BaseModel):
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
     ignore_case: bool = True
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("pattern")
+    @classmethod
+    def validate_pattern(cls, value: str) -> str:
+        try:
+            re.compile(value)
+        except re.error as exc:
+            raise ValueError(f"invalid regex pattern: {exc}") from exc
+        return value
 
 
 class DomainValidatorManifest(BaseModel):
@@ -44,6 +63,17 @@ class DomainValidatorManifest(BaseModel):
     ignore_case: bool = True
     section: Optional[str] = None
     config: Dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("pattern")
+    @classmethod
+    def validate_pattern(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        try:
+            re.compile(value)
+        except re.error as exc:
+            raise ValueError(f"invalid regex pattern: {exc}") from exc
+        return value
 
 
 class DomainModelManifest(BaseModel):
@@ -66,10 +96,10 @@ class DomainVerifierConfigManifest(BaseModel):
     """Declarative verifier policy for post-synthesis model checks."""
 
     mode: str = "advisory"
-    retry_limit: int = 0
-    timeout_seconds: float = 1.0
-    max_issues: int = 4
-    pass_threshold: float = 0.5
+    retry_limit: int = Field(default=0, ge=0)
+    timeout_seconds: float = Field(default=1.0, ge=0.0)
+    max_issues: int = Field(default=4, ge=0)
+    pass_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     config: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("mode")
@@ -116,6 +146,17 @@ class DomainDocumentDetectionManifest(BaseModel):
     patterns: List[str] = Field(default_factory=list)
     min_matches: int = Field(default=1, ge=1)
 
+    @field_validator("patterns", mode="before")
+    @classmethod
+    def validate_patterns(cls, value: object) -> object:
+        if isinstance(value, list):
+            for item in value:
+                try:
+                    re.compile(str(item))
+                except re.error as exc:
+                    raise ValueError(f"invalid regex pattern {item!r}: {exc}") from exc
+        return value
+
 
 class DomainDocTagsManifest(BaseModel):
     """DocTag mapping configuration."""
@@ -132,6 +173,17 @@ class DomainQueryRoutingManifest(BaseModel):
     default_query_type: Optional[str] = None
     default_strategy: Optional[str] = None
     default_confidence: float = Field(default=0.75, ge=0.0, le=1.0)
+
+    @field_validator("markers", mode="before")
+    @classmethod
+    def validate_markers(cls, value: object) -> object:
+        if isinstance(value, list):
+            for item in value:
+                try:
+                    re.compile(str(item))
+                except re.error as exc:
+                    raise ValueError(f"invalid regex pattern {item!r}: {exc}") from exc
+        return value
 
 
 class DomainPackManifest(BaseModel):

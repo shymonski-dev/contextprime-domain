@@ -53,3 +53,15 @@ Packs should contribute:
 
 Packs should not assume the host runtime’s internal enums or classes.
 Return semantic tag keys and generic metadata instead.
+
+## Regex Patterns
+
+All regex patterns declared in `document_detection.patterns`, `doctags`,
+`query_routing.rules`, and `query_routing.markers` are validated for
+syntactic correctness at manifest load time — an invalid pattern raises
+an error immediately.
+
+However, syntactically valid patterns that cause catastrophic backtracking
+(e.g. `(a+)+$`) are **not** blocked at load time. Authors are responsible
+for testing patterns against representative inputs before distribution.
+Use anchored patterns and avoid deeply nested quantifiers.

@@ -53,6 +53,16 @@ See [examples/contracts/domain_pack.yaml](examples/contracts/domain_pack.yaml) f
   `DOMAIN_INCLUDE_BUILTIN` and `DOMAIN_SEARCH_PATHS` directly from the
   environment. If `contextprime` is installed, it can also fall back to that
   settings layer.
+- The registry singleton is thread-safe; `get_default_domain_registry()` can
+  be called concurrently from multiple threads.
+- All manifest-supplied regex patterns are validated at load time. Invalid
+  patterns raise `ValidationError` immediately. See `docs/AUTHORING.md` for
+  guidance on avoiding catastrophic backtracking.
+- Manifest-supplied file paths for benchmark datasets and model bindings are
+  checked for containment within the pack directory. Paths that escape raise
+  `ValueError`.
+- Optional: install `contextprime-domain[full]` to enable correct pre-release
+  version comparison via the `packaging` library.
 
 ## Repository Layout
 

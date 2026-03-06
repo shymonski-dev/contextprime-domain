@@ -5,7 +5,7 @@ Domain pack interfaces for distributable domain specialization.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, ClassVar, Dict, List, Optional
 
 
 @dataclass(frozen=True)
@@ -141,8 +141,20 @@ class DomainPack:
     benchmark metadata without changing the core engine.
     """
 
-    name: str = "base"
-    description: str = "Base domain pack"
+    name: ClassVar[str] = "base"
+    description: ClassVar[str] = "Base domain pack"
+
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        super().__init_subclass__(**kwargs)
+        name = str(getattr(cls, "name", "") or "").strip()
+        if name and name != "base":
+            if name != name.lower() or not all(
+                c.isalnum() or c in {"-", "_"} for c in name
+            ):
+                raise TypeError(
+                    f"DomainPack subclass {cls.__name__!r} has invalid name {name!r}; "
+                    "name must be lowercase alphanumeric with '-' or '_'"
+                )
 
     def pack_version(self) -> str:
         """Return the version of the pack itself."""

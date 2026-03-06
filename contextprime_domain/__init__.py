@@ -30,6 +30,8 @@ from .manifest import (
     DomainBenchmarkDatasetManifest,
     DomainModelManifest,
     DomainPackManifest,
+    DomainQueryRuleManifest,
+    DomainTagRuleManifest,
     DomainVerifierConfigManifest,
     DomainValidatorManifest,
 )
@@ -55,6 +57,8 @@ __all__ = [
     "DomainVerifierResult",
     "DomainValidatorSpec",
     "DomainPackManifest",
+    "DomainQueryRuleManifest",
+    "DomainTagRuleManifest",
     "DomainValidatorManifest",
     "DomainRegistry",
     "FileSystemDomainPack",

@@ -5,6 +5,7 @@ Registry for pluggable domain packs.
 from __future__ import annotations
 
 import os
+import threading
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -46,10 +47,12 @@ class DomainRegistry:
         for pack in discover_domain_packs(paths):
             if pack.name in self._packs:
                 logger.warning(
-                    "Domain pack {} from {} overrides an existing registration",
+                    "Domain pack {} from {} already registered; keeping existing",
                     pack.name,
                     getattr(pack, "source_dir", "<unknown>"),
                 )
+                loaded_names.append(pack.name)
+                continue
             self.register(pack)
             loaded_names.append(pack.name)
         return loaded_names
@@ -135,22 +138,19 @@ class DomainRegistry:
     ) -> Dict[str, object]:
         """Merge synthesis profiles from resolved domain packs."""
         merged: Dict[str, object] = {}
-        merged_lists: Dict[str, List[str]] = {
-            "sections": [],
-            "validators": [],
-            "required_sections": [],
-            "required_fields": [],
-            "style_instructions": [],
-        }
+        merged_lists: Dict[str, List[str]] = {}
 
         for pack in self.resolve(names):
             profile = dict(pack.synthesis_profile() or {})
             for key, value in profile.items():
-                if key in merged_lists and isinstance(value, list):
+                if isinstance(value, list):
+                    bucket = merged_lists.setdefault(key, [])
+                    seen = {item.lower() for item in bucket}
                     for item in value:
                         token = str(item).strip()
-                        if token and token not in merged_lists[key]:
-                            merged_lists[key].append(token)
+                        if token and token.lower() not in seen:
+                            seen.add(token.lower())
+                            bucket.append(token)
                 else:
                     merged[key] = value
 
@@ -329,12 +329,17 @@ class DomainRegistry:
 
 
 _DEFAULT_REGISTRY: Optional[DomainRegistry] = None
+_DEFAULT_REGISTRY_LOCK = threading.Lock()
 
 
 def get_default_domain_registry() -> DomainRegistry:
     """Return the default registry with built-in domain packs registered."""
     global _DEFAULT_REGISTRY
-    if _DEFAULT_REGISTRY is None:
+    if _DEFAULT_REGISTRY is not None:
+        return _DEFAULT_REGISTRY
+    with _DEFAULT_REGISTRY_LOCK:
+        if _DEFAULT_REGISTRY is not None:
+            return _DEFAULT_REGISTRY
         builtins: List[DomainPack] = [LegalDomainPack()]
         search_paths: List[Path] = []
         include_builtin = True

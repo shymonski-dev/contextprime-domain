@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Iterable, List, Optional
 
@@ -102,7 +103,8 @@ def _handle_show_pack(args: argparse.Namespace) -> int:
     )
     pack = registry.get(args.target)
     if pack is None:
-        raise SystemExit(f"Unknown domain pack: {args.target}")
+        print(f"Error: Unknown domain pack: {args.target}", file=sys.stderr)
+        return 1
 
     summary = summarize_domain_pack(pack)
     if args.json:
@@ -180,7 +182,8 @@ def _handle_test_pack(args: argparse.Namespace) -> int:
                 None,
             )
             if dataset_path is None:
-                raise SystemExit(f"Unknown benchmark dataset for pack: {dataset}")
+                print(f"Error: Unknown benchmark dataset for pack: {dataset}", file=sys.stderr)
+                return 1
             samples = pack.load_benchmark_samples(dataset) or []
             output["datasets"].append(
                 {"name": dataset, "path": dataset_path, "samples": len(samples)}
@@ -192,7 +195,8 @@ def _handle_test_pack(args: argparse.Namespace) -> int:
         )
         pack = registry.get(args.target)
         if pack is None:
-            raise SystemExit(f"Unknown domain pack: {args.target}")
+            print(f"Error: Unknown domain pack: {args.target}", file=sys.stderr)
+            return 1
         datasets = registry.collect_benchmark_datasets(names=[pack.name])
         dataset_names = [dataset.name for dataset in datasets]
         if args.dataset:
